@@ -1,7 +1,50 @@
 <!doctype html>
 <html>
 
+<head>
+    <style>
+        input {
+            position: relative;
+        }
+    </style>
+</head>
+
 <body>
+    <div id="canvas" style="width: 100%; height: 60%">
+    </div>
+    <div id="controls">
+        <label for="resrange">Resolution: </label>
+        <input type="range" id="resrange" min=0.8 max=5 step=0.1 />
+
+        <br>
+        <label for="exp">Exponent: </label>
+        <input type="range" id="exp" min=0.5 max=10 step=0.1 />
+
+        <br>
+        <label for="e1">E1: </label>
+        <input type="range" id="e1" min=0 max=1 step=0.01 />
+
+        <br>
+        <label for="e2">E2: </label>
+        <input type="range" id="e2" min=0 max=1 step=0.01 />
+
+        <br>
+        <label for="e3">E3: </label>
+        <input type="range" id="e3" min=0 max=1 step=0.01 />
+
+        <br>
+        <label for="e4">E4: </label>
+        <input type="range" id="e4" min=0 max=1 step=0.01 />
+
+        <br>
+        <label for="e5">E5: </label>
+        <input type="range" id="e5" min=0 max=1 step=0.01 />
+
+        <br>
+        <label for="e6">E6: </label>
+        <input type="range" id="e6" min=0 max=1 step=0.01 />
+    </div>
+
     <script src="./app.tsx"></script>
 </body>
 
