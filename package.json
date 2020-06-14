@@ -13,6 +13,10 @@
     "typescript": "^3.9.3"
   },
   "dependencies": {
-    "twojs-ts": "^0.7.0-13"
+    "@types/two.js": "^0.7.2",
+    "open-simplex-noise": "^2.3.1",
+    "quadtree-lib": "^1.0.9",
+    "ts-priority-queue": "^0.1.1",
+    "two.js": "^0.7.0-stable.1"
   }
 }
