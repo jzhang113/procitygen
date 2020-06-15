@@ -1,16 +1,19 @@
 import Two from 'two.js';
 import QuadTree from 'quadtree-lib';
 import PriorityQueue from 'ts-priority-queue';
-import { PopMap } from './popmap';
-import { RoadData, LocalModification } from './roaddata'
+import { PopMap } from '../popmap';
+import { RoadData, LocalModification } from './roaddata';
+import { DCEL, HalfEdge } from '../geometry';
 
 export class RoadQuery {
 	t: number;
 	roadData: RoadData;
+	prevData: HalfEdge;
 
-	constructor(t: number, ra: any) {
+	constructor(t: number, ra: RoadData, prev: HalfEdge) {
 		this.t = t;
 		this.roadData = ra;
+		this.prevData = prev;
 	}
 }
 
@@ -19,6 +22,8 @@ export class RoadQuery {
 // Modeling of Cities
 export class GrowthModel implements RoadModel {
 	two: Two;
+	model: DCEL;
+	
 	width: number;
 	height: number;
 
@@ -31,6 +36,8 @@ export class GrowthModel implements RoadModel {
 
 	constructor(two: Two, width: number, height: number) {
 		this.two = two;
+		this.model = new DCEL();
+		
 		this.width = width;
 		this.height = height;
 
@@ -40,30 +47,35 @@ export class GrowthModel implements RoadModel {
 	}
 
 	reset(): void {
+		this.model.reset();
+		
 		let firstroad = new RoadData();
 		firstroad.startx = Math.random() * 200 + 100;
 		firstroad.starty = Math.random() * 200 + 100;
 		firstroad.length = Math.random() * 10 + 10;
-		firstroad.angle = Math.random() * 2 * Math.PI;
+		firstroad.angle = Math.random() * 2 * Math.PI;				
+		firstroad.edge = this.model.makeHalfEdgeA(firstroad.startx, firstroad.starty, firstroad.endx, firstroad.endy);
 
 		let opproad = new RoadData();
 		opproad.startx = firstroad.startx;
 		opproad.starty = firstroad.starty;
 		opproad.length = Math.random() * 10 + 10;
 		opproad.angle = firstroad.angle + Math.PI;
+		opproad.edge = this.model.makeHalfEdgeB(firstroad.edge.twin.dest, opproad.endx, opproad.endy);
 
 		this.Q.clear();
-		this.Q.queue(new RoadQuery(0, firstroad));
-		this.Q.queue(new RoadQuery(1, opproad));
+		this.Q.queue(new RoadQuery(0, firstroad, null));
+		this.Q.queue(new RoadQuery(1, opproad, null));
 		this.S = [];
 		this.T.clear();
 
 		this.prevline = null;
 	}
 
-	step(): boolean {
+	step(): boolean {		
 		if (this.Q.length <= 0) {
 			console.log('done');
+			console.log(this.model);
 			return false;
 		}
 
@@ -72,12 +84,27 @@ export class GrowthModel implements RoadModel {
 
 		if (success) {
 			let road = next.roadData;
-			console.log(next.roadData.modification);
+			// console.log(next.roadData.modification);
 
 			this.S.push(road);
 			this.T.push(road);
 
 			let roadline = this.two.makeLine(road.startx, road.starty, road.endx, road.endy);
+			
+			if (next.prevData != null) {
+				let prevVertex = next.prevData.dest;
+				let halfedge;
+				
+				if (road.modification === LocalModification.none) {
+					halfedge = this.model.makeHalfEdgeB(prevVertex, road.endx, road.endy);
+				}
+				else {
+					halfedge = this.model.makeHalfEdgeC(prevVertex, road.edge.dest);
+				}
+
+				road.edge = halfedge;
+			}
+			
 			roadline.stroke = 'red';
 			next.roadData.segment = roadline;
 
@@ -112,10 +139,11 @@ export class GrowthModel implements RoadModel {
 
 		//  If we have collisions with another road, attempt to shorten the road
 		if (collisions.length >= 1) {
-			let minIntersectFrac = this.findClosestIntersect(collisions, road);
-			if (minIntersectFrac > 0.5) {
-				road.length *= minIntersectFrac;
+			let [intersectFrac, closest] = this.findClosestIntersect(collisions, road);
+			if (intersectFrac > 0.5) {
+				road.length *= intersectFrac;
 				road.modification = LocalModification.shorten;
+				road.edge = closest.edge;
 				return true;
 			}
 			else {
@@ -135,9 +163,10 @@ export class GrowthModel implements RoadModel {
 
 		let roadsAhead = this.T.colliding(phantom, RoadData.checkCollision);
 		if (roadsAhead.length >= 1) {
-			let minIntersectFrac = this.findClosestIntersect(roadsAhead, phantom);
-			road.length *= (1 + minIntersectFrac * 0.5);
+			let [intersectFrac, closest] = this.findClosestIntersect(roadsAhead, phantom);
+			road.length *= (1 + intersectFrac * 0.5);
 			road.modification = LocalModification.lengthen;
+			road.edge = closest.edge;
 			return true;
 		}
 
@@ -159,7 +188,7 @@ export class GrowthModel implements RoadModel {
 			}
 		});
 
-		return minIntersectFrac;
+		return [minIntersectFrac, closestRoad];
 	}
 
 	// propose up to three new roads (forward, left, and right) to add to the
@@ -212,6 +241,6 @@ export class GrowthModel implements RoadModel {
 		}
 
 		newroad.angle = finalangle / contribs;
-		this.Q.queue(new RoadQuery(query.t + 1, newroad));
+		this.Q.queue(new RoadQuery(query.t + 1, newroad, query.roadData.edge));
 	}
 }

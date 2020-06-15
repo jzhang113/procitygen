@@ -1,13 +1,18 @@
 import Two from 'two.js';
+import { DCEL } from '../geometry';
 
 export interface RoadModel {
 	two: Two;
+	model: DCEL;
+	
 	reset(): void;
 	step(): boolean;
 }
 
 export class RandomWalkModel implements RoadModel {
 	two: Two;
+	model: DCEL;
+	
 	iter: number;
 	maxIters: number;
 	currx: number;

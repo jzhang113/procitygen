@@ -1,4 +1,5 @@
 import QuadTree from 'quadtree-lib';
+import { HalfEdge } from '../geometry';
 
 export enum LocalModification {
 	none,
@@ -31,6 +32,8 @@ export class RoadData implements QuadTree.QuadtreeItem {
 	 * Visual line corresponding to this road
 	 */
 	segment: Two.Line;
+
+	edge: HalfEdge;
 
 	get endx() {
 		return this.startx + this.length * Math.sin(this.angle);

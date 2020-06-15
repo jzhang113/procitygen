@@ -29,7 +29,7 @@ function keyHandler(event: KeyboardEvent): void {
 
     if (event.key == 'r') {
         pm = new PopMap(400, 400);
-        makeMap();
+        makeMap();		
 
         if (roadgen instanceof GrowthModel) {
             (roadgen as GrowthModel).popmap = pm;
@@ -47,6 +47,52 @@ function keyHandler(event: KeyboardEvent): void {
     else if (event.key === "Escape") {
         running = false;
     }
+	else if (event.key === 'v') {
+		// enumerate vertices
+		roadgen.model.vertices.forEach(vert => {
+			let circ = two.makeCircle(vert.x, vert.y, 2);
+			circ.stroke = 'red';
+		})
+	}
+	else if (event.key === 'e') {
+		// enumerate edges
+		roadgen.model.edges.forEach(edge => {
+			let line = two.makeLine(edge.twin.dest.x, edge.twin.dest.y, edge.dest.x, edge.dest.y);
+			line.stroke = 'red';
+		})
+	}
+	else if (event.key === 'f') {
+		// enumerate faces
+		roadgen.model.faces.forEach(face => {
+			let firstEdge = face.boundary;
+			let currEdge = firstEdge;
+			
+			let prevx = firstEdge.dest.x;
+			let prevy = firstEdge.dest.y;
+			let vertices = [ new Two.Anchor(prevx, prevy) ];
+			let color = randomColor();
+				
+			while (currEdge.next !== firstEdge) {
+				currEdge = currEdge.next;
+				vertices.push(new Two.Anchor(currEdge.dest.x, currEdge.dest.y));
+
+				let line = two.makeLine(prevx, prevy, currEdge.dest.x, currEdge.dest.y);
+				line.stroke = color;
+				
+				prevx = currEdge.dest.x;
+				prevy = currEdge.dest.y;				
+			}
+			
+			let poly = two.makePath(vertices, false);
+			console.log(vertices);
+			poly.fill = randomColor;
+		});
+	}
+}
+
+function randomColor(): string {
+	let randomColor = Math.floor(Math.random()*16777215).toString(16);
+	return "#" + randomColor;
 }
 
 document.getElementById("stepbut").onclick = () => { roadgen.step(); };
