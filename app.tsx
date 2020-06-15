@@ -1,5 +1,6 @@
 import Two from 'two.js';
-import { RoadModel, RandomWalkModel, GrowthModel } from './roadmodel';
+import { RoadModel } from './roads/roadmodel';
+import { GrowthModel } from './roads/growthmodel';
 import { PopMap, PopMapParams } from './popmap';
 import { Binding } from './binding';
 
