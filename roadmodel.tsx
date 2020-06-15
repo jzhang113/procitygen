@@ -143,7 +143,7 @@ export class RoadData implements QuadTree.QuadtreeItem {
 	 * @param other the other road to test intersection with
 	 * @returns Fraction the intersection occurs on each line segments if they intersect or FALSE otherwise
 	 */
-	intersect(other: RoadData): boolean | { ua: number, ub: number } {
+	intersect(other: RoadData): false | { ua: number, ub: number } {
 		let x1 = this.startx, y1 = this.starty;
 		let x2 = this.endx, y2 = this.endy;
 		let x3 = other.startx, y3 = other.starty;
@@ -173,6 +173,22 @@ export class RoadData implements QuadTree.QuadtreeItem {
 		// let x = x1 + ua * (x2 - x1)
 		// let y = y1 + ua * (y2 - y1)
 		return { ua, ub };
+	}
+
+	/**
+	 * Collision check for comparing roads in the quadtree
+	 * @param r1 first road to compare
+	 * @param r2 second road to compare
+	 * @returns TRUE if the roads intersect and FALSE otherwise
+	 */
+	static checkCollision(r1: RoadData, r2: RoadData) {
+		let intersection = r1.intersect(r2);
+		if (intersection === false) {
+			return false;
+		}
+		else {
+			return true;
+		}
 	}
 }
 
@@ -247,6 +263,9 @@ export class GrowthModel implements RoadModel {
 				if (this.prevline.modification === LocalModification.shorten) {
 					this.prevline.segment.stroke = 'lightgreen';
 				}
+				else if (this.prevline.modification == LocalModification.lengthen) {
+					this.prevline.segment.stroke = 'darkgray';
+				}
 				else {
 					this.prevline.segment.stroke = 'green';
 				}
@@ -267,34 +286,11 @@ export class GrowthModel implements RoadModel {
 	// if a road is too short and ends close to another road, it is extended so
 	// it meets up with the other road
 	private localConstraints(road: RoadData): boolean {
-		let collisions = this.T.colliding(road, (r1, r2) => {
-			let intersection = r1.intersect(r2);
-			if (typeof intersection === "boolean") {
-				return false;
-			}
-			else {
-				return true;
-			}
-		});
+		let collisions = this.T.colliding(road, RoadData.checkCollision);
 
 		//  If we have collisions with another road, attempt to shorten the road
 		if (collisions.length >= 1) {
-			let minIntersectFrac = 1;
-			let closestRoad;
-
-			// identify the closest road that collides
-			collisions.forEach(element => {
-				let intersection = road.intersect(element);
-
-				// intersection should not be false here
-				if (typeof intersection !== "boolean") {
-					if (intersection.ua < minIntersectFrac) {
-						minIntersectFrac = intersection.ua;
-						closestRoad = element;
-					}
-				}
-			});
-
+			let minIntersectFrac = this.findClosestIntersect(collisions, road);
 			if (minIntersectFrac > 0.5) {
 				road.length *= minIntersectFrac;
 				road.modification = LocalModification.shorten;
@@ -305,7 +301,43 @@ export class GrowthModel implements RoadModel {
 			}
 		}
 
+		// Check ahead to see if we can meet up with another road
+		// We do this by inserting a phantom element into the quadtree and checking
+		// if any roads intersect with this new element
+		// TODO: check for an intersection in a cone
+		let phantom = new RoadData();
+		phantom.startx = road.endx;
+		phantom.starty = road.endy;
+		phantom.angle = road.angle;
+		phantom.length = road.length * 0.5;
+
+		let roadsAhead = this.T.colliding(phantom, RoadData.checkCollision);
+		if (roadsAhead.length >= 1) {
+			let minIntersectFrac = this.findClosestIntersect(roadsAhead, phantom);
+			road.length *= (1 + minIntersectFrac * 0.5);
+			road.modification = LocalModification.lengthen;
+			return true;
+		}
+
 		return true;
+	}
+
+	private findClosestIntersect(collisions: RoadData[], road: RoadData) {
+		let minIntersectFrac = 1;
+		let closestRoad;
+		// identify the closest road that collides
+		collisions.forEach(element => {
+			let intersection = road.intersect(element);
+			// intersection should not be false here
+			if (intersection !== false) {
+				if (intersection.ua < minIntersectFrac) {
+					minIntersectFrac = intersection.ua;
+					closestRoad = element;
+				}
+			}
+		});
+
+		return minIntersectFrac;
 	}
 
 	// propose up to three new roads (forward, left, and right) to add to the
@@ -327,7 +359,8 @@ export class GrowthModel implements RoadModel {
 			this.sampleRoad(query, query.roadData.angle);
 		}
 
-		if (3 * growthrand < growthchance) {
+		// intersections (roads that have been modified to meet another road) don't branch
+		if (query.roadData.modification === LocalModification.none && 3 * growthrand < growthchance) {
 			if (Math.random() < 0.5) {
 				// branch left
 				this.sampleRoad(query, query.roadData.angle - Math.PI / 2);
