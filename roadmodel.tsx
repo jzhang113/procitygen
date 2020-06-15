@@ -65,6 +65,12 @@ export class RoadQuery {
 	}
 }
 
+export enum LocalModification {
+	none,
+	shorten,
+	lengthen
+}
+
 export class RoadData implements QuadTree.QuadtreeItem {
 	/**
 	 * Starting x-coordinate of the road
@@ -82,6 +88,14 @@ export class RoadData implements QuadTree.QuadtreeItem {
 	 * Angle of the road, in radians
 	 */
 	angle: number;
+	/**
+	 * Records the post-processing step that was applied to this road
+	 */
+	modification: LocalModification = LocalModification.none;
+	/**
+	 * Visual line corresponding to this road
+	 */
+	segment: Two.Line;
 
 	get endx() {
 		return this.startx + this.length * Math.sin(this.angle);
@@ -127,9 +141,9 @@ export class RoadData implements QuadTree.QuadtreeItem {
 	 * ine intercept math by Paul Bourke http://paulbourke.net/geometry/pointlineplane/
 	 * Determine whether two line segments intersect
 	 * @param other the other road to test intersection with
-	 * @returns Return TRUE if the line segments intersect and FALSE otherwise
+	 * @returns Fraction the intersection occurs on each line segments if they intersect or FALSE otherwise
 	 */
-	intersect(other: RoadData): boolean {
+	intersect(other: RoadData): boolean | { ua: number, ub: number } {
 		let x1 = this.startx, y1 = this.starty;
 		let x2 = this.endx, y2 = this.endy;
 		let x3 = other.startx, y3 = other.starty;
@@ -154,13 +168,11 @@ export class RoadData implements QuadTree.QuadtreeItem {
 		if (ua <= 0 || ua > 1 || ub <= 0 || ub > 1) {
 			return false;
 		}
-		else {
-			return true;
-		}
 
 		// Return a object with the x and y coordinates of the intersection
 		// let x = x1 + ua * (x2 - x1)
 		// let y = y1 + ua * (y2 - y1)
+		return { ua, ub };
 	}
 }
 
@@ -177,7 +189,7 @@ export class GrowthModel implements RoadModel {
 	T: QuadTree<RoadData>;
 	popmap: PopMap;
 
-	private prevline: Two.Line;
+	private prevline: RoadData;
 
 	constructor(two: Two, width: number, height: number) {
 		this.two = two;
@@ -222,17 +234,25 @@ export class GrowthModel implements RoadModel {
 
 		if (success) {
 			let road = next.roadData;
+			console.log(next.roadData.modification);
 
 			this.S.push(road);
 			this.T.push(road);
 
 			let roadline = this.two.makeLine(road.startx, road.starty, road.endx, road.endy);
 			roadline.stroke = 'red';
+			next.roadData.segment = roadline;
 
 			if (this.prevline != null) {
-				this.prevline.stroke = 'green';
+				if (this.prevline.modification === LocalModification.shorten) {
+					this.prevline.segment.stroke = 'lightgreen';
+				}
+				else {
+					this.prevline.segment.stroke = 'green';
+				}
+
 			}
-			this.prevline = roadline;
+			this.prevline = next.roadData;
 
 			this.globalConstraints(next);
 		}
@@ -248,13 +268,41 @@ export class GrowthModel implements RoadModel {
 	// it meets up with the other road
 	private localConstraints(road: RoadData): boolean {
 		let collisions = this.T.colliding(road, (r1, r2) => {
-			return r1.intersect(r2);
+			let intersection = r1.intersect(r2);
+			if (typeof intersection === "boolean") {
+				return false;
+			}
+			else {
+				return true;
+			}
 		});
 
-		if (collisions.length > 0) {
-			console.log(collisions);
+		//  If we have collisions with another road, attempt to shorten the road
+		if (collisions.length >= 1) {
+			let minIntersectFrac = 1;
+			let closestRoad;
 
-			return false;
+			// identify the closest road that collides
+			collisions.forEach(element => {
+				let intersection = road.intersect(element);
+
+				// intersection should not be false here
+				if (typeof intersection !== "boolean") {
+					if (intersection.ua < minIntersectFrac) {
+						minIntersectFrac = intersection.ua;
+						closestRoad = element;
+					}
+				}
+			});
+
+			if (minIntersectFrac > 0.5) {
+				road.length *= minIntersectFrac;
+				road.modification = LocalModification.shorten;
+				return true;
+			}
+			else {
+				return false;
+			}
 		}
 
 		return true;
