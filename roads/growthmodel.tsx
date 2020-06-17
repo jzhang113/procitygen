@@ -2,6 +2,7 @@ import Two from 'two.js';
 import QuadTree from 'quadtree-lib';
 import PriorityQueue from 'ts-priority-queue';
 import { PopMap } from '../popmap';
+import { RoadModel } from './roadmodel';
 import { RoadData, LocalModification } from './roaddata';
 import { DCEL, HalfEdge } from '../geometry';
 
@@ -23,7 +24,7 @@ export class RoadQuery {
 export class GrowthModel implements RoadModel {
 	two: Two;
 	model: DCEL;
-	
+
 	width: number;
 	height: number;
 
@@ -37,7 +38,7 @@ export class GrowthModel implements RoadModel {
 	constructor(two: Two, width: number, height: number) {
 		this.two = two;
 		this.model = new DCEL();
-		
+
 		this.width = width;
 		this.height = height;
 
@@ -48,20 +49,20 @@ export class GrowthModel implements RoadModel {
 
 	reset(): void {
 		this.model.reset();
-		
+
 		let firstroad = new RoadData();
 		firstroad.startx = Math.random() * 200 + 100;
 		firstroad.starty = Math.random() * 200 + 100;
 		firstroad.length = Math.random() * 10 + 10;
-		firstroad.angle = Math.random() * 2 * Math.PI;				
-		firstroad.edge = this.model.makeHalfEdgeA(firstroad.startx, firstroad.starty, firstroad.endx, firstroad.endy);
+		firstroad.angle = Math.random() * 2 * Math.PI;
+		firstroad.edge = this.model.addNewEdge(firstroad.startx, firstroad.starty, firstroad.endx, firstroad.endy);
 
 		let opproad = new RoadData();
 		opproad.startx = firstroad.startx;
 		opproad.starty = firstroad.starty;
 		opproad.length = Math.random() * 10 + 10;
 		opproad.angle = firstroad.angle + Math.PI;
-		opproad.edge = this.model.makeHalfEdgeB(firstroad.edge.twin.dest, opproad.endx, opproad.endy);
+		opproad.edge = this.model.addVertex(firstroad.edge.twin.dest, opproad.endx, opproad.endy);
 
 		this.Q.clear();
 		this.Q.queue(new RoadQuery(0, firstroad, null));
@@ -72,7 +73,7 @@ export class GrowthModel implements RoadModel {
 		this.prevline = null;
 	}
 
-	step(): boolean {		
+	step(): boolean {
 		if (this.Q.length <= 0) {
 			console.log('done');
 			console.log(this.model);
@@ -90,21 +91,21 @@ export class GrowthModel implements RoadModel {
 			this.T.push(road);
 
 			let roadline = this.two.makeLine(road.startx, road.starty, road.endx, road.endy);
-			
+
 			if (next.prevData != null) {
 				let prevVertex = next.prevData.dest;
 				let halfedge;
-				
+
 				if (road.modification === LocalModification.none) {
-					halfedge = this.model.makeHalfEdgeB(prevVertex, road.endx, road.endy);
+					halfedge = this.model.addVertex(prevVertex, road.endx, road.endy);
 				}
 				else {
-					halfedge = this.model.makeHalfEdgeC(prevVertex, road.edge.dest);
+					halfedge = this.model.splitFace(prevVertex, road.edge.dest);
 				}
 
 				road.edge = halfedge;
 			}
-			
+
 			roadline.stroke = 'red';
 			next.roadData.segment = roadline;
 
