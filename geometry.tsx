@@ -2,8 +2,8 @@
 // See http://www.holmes3d.net/graphics/dcel for a description of this data structure
 // Edges represent roads, faces represent blocks
 
-import { RoadData } from './roads/roaddata'
-import { orient2d } from 'robust-predicates'
+import { RoadData } from './roads/roaddata';
+import { orient2d } from 'robust-predicates';
 
 export class HalfEdge {
     twin: HalfEdge;
@@ -12,14 +12,10 @@ export class HalfEdge {
     face: Face;
     data: RoadData;
 
-    /**
-     * Check if a vertex is left or right of this line segment by checking the 
-     * sign of the determinant of the segments ab and ac
-     */
     leftof(c: Vertex): boolean {
         let a = this.twin.dest;
         let b = this.dest;
-        return orient2d(a.x, a.y, b.x, b.y, c.x, c.y) > 0;
+        return orient2d(a.x, a.y, b.x, b.y, c.x, c.y) >= 0;
     }
 }
 
@@ -48,7 +44,7 @@ export class DCEL {
     reset() {
         this.edges = [];
         this.vertices = [];
-        this.faces = [];
+        this.faces = [this.outside];
     }
 
     /**
@@ -119,29 +115,58 @@ export class DCEL {
      * Add a new half edge between two existing vertices, creating a new face
      */
     splitFace(v1: Vertex, v2: Vertex): HalfEdge {
-        let newface = new Face();
+        let left = this.findSegmentLeft(v1, v2);
+        let right = this.findSegmentLeft(v2, v1);
+
         let edge = new HalfEdge();
         let opp = new HalfEdge();
 
-        let l1 = this.findSegmentLeft(v1, v2);
-
         edge.twin = opp;
         edge.dest = v2;
-        edge.face = v1.arriving.face;
-        edge.next = v2.arriving.next;
-        v2.arriving.next = opp;
+        edge.next = right.next;
+        right.next = opp;
         v2.arriving = edge;
 
         opp.twin = edge;
         opp.dest = v1;
-        opp.next = v1.arriving.twin;
-        opp.face = newface;
-        newface.boundary = opp;
+        opp.next = left.next;
+        left.next = edge;
         v1.arriving = opp;
+
+        let oldface = left.face;
+        let f1 = new Face();
+        f1.boundary = edge;
+        edge.face = f1;
+        let first = edge;
+        let trace = first.next;
+
+        while (trace !== first) {
+            trace.face = f1;
+            trace = trace.next;
+        }
+
+        let f2 = new Face();
+        f2.boundary = opp;
+        opp.face = f2;
+        first = opp;
+        trace = first.next;
+
+        while (trace !== first) {
+            trace.face = f2;
+            trace = trace.next;
+        }
+
+        let index = this.faces.indexOf(oldface);
+        if (index > -1) {
+            this.faces.splice(index, 1);
+        }
+
+        this.faces.push(f1);
+        this.faces.push(f2);
+
 
         this.edges.push(edge);
         this.edges.push(opp);
-        this.faces.push(newface);
 
         return edge;
     }
@@ -153,7 +178,7 @@ export class DCEL {
         let leftedge = v1.arriving;
         let rightedge = leftedge.next;
 
-        while (!leftedge.leftof(v2) && !rightedge.leftof(v2)) {
+        while (!(leftedge.leftof(v2) && rightedge.leftof(v2))) {
             // v2 is not between the edges, so we move to the next arriving half edge to v1
             leftedge = rightedge.twin;
             rightedge = leftedge.next;
