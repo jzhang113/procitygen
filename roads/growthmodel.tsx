@@ -55,6 +55,8 @@ export class GrowthModel implements RoadModel {
 		firstroad.length = Math.random() * 10 + 10;
 		firstroad.angle = Math.random() * 2 * Math.PI;				
 		firstroad.edge = this.model.makeHalfEdgeA(firstroad.startx, firstroad.starty, firstroad.endx, firstroad.endy);
+		firstroad.edge.data = firstroad;
+		firstroad.edge.twin.data = firstroad;
 
 		let opproad = new RoadData();
 		opproad.startx = firstroad.startx;
@@ -62,10 +64,12 @@ export class GrowthModel implements RoadModel {
 		opproad.length = Math.random() * 10 + 10;
 		opproad.angle = firstroad.angle + Math.PI;
 		opproad.edge = this.model.makeHalfEdgeB(firstroad.edge.twin.dest, opproad.endx, opproad.endy);
+		opproad.edge.data = opproad;
+		opproad.edge.twin.data = opproad;
 
 		this.Q.clear();
 		this.Q.queue(new RoadQuery(0, firstroad, null));
-		this.Q.queue(new RoadQuery(1, opproad, null));
+		// this.Q.queue(new RoadQuery(1, opproad, null));
 		this.S = [];
 		this.T.clear();
 
@@ -103,6 +107,8 @@ export class GrowthModel implements RoadModel {
 				}
 
 				road.edge = halfedge;
+				halfedge.data = road;
+				halfedge.twin.data = road;
 			}
 			
 			roadline.stroke = 'red';

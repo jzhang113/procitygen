@@ -12,11 +12,11 @@ let two = new Two({
 let running = false;
 let roadgen: RoadModel = new GrowthModel(two, 400, 400);
 
-two.bind(Two.Events.update.toString(), function () {
-    if (running) {
-        running = roadgen.step();
-    }
-});
+// two.bind(Two.Events.update.toString(), function () {
+    // if (running) {
+        // running = roadgen.step();
+    // }
+// });
 
 let pm = new PopMap(400, 400);
 let pmp = new PopMapParams();
@@ -63,31 +63,40 @@ function keyHandler(event: KeyboardEvent): void {
 	}
 	else if (event.key === 'f') {
 		// enumerate faces
-		roadgen.model.faces.forEach(face => {
-			let firstEdge = face.boundary;
-			let currEdge = firstEdge;
-			
-			let prevx = firstEdge.dest.x;
-			let prevy = firstEdge.dest.y;
-			let vertices = [ new Two.Anchor(prevx, prevy) ];
-			let color = randomColor();
-				
-			while (currEdge.next !== firstEdge) {
-				currEdge = currEdge.next;
-				vertices.push(new Two.Anchor(currEdge.dest.x, currEdge.dest.y));
-
-				let line = two.makeLine(prevx, prevy, currEdge.dest.x, currEdge.dest.y);
-				line.stroke = color;
-				
-				prevx = currEdge.dest.x;
-				prevy = currEdge.dest.y;				
-			}
-			
-			let poly = two.makePath(vertices, false);
-			console.log(vertices);
-			poly.fill = randomColor;
-		});
+		// roadgen.model.faces.forEach(face => {
+		// 		traceFace(face);
+		// });
+		
+		traceFace(roadgen.model.faces[currface++ % roadgen.model.faces.length]);
 	}
+	else if (event.key === 'z') {
+		roadgen.step();
+	}
+}
+
+let currface = 0;
+let poly;
+
+function traceFace(face: Face) {
+	two.remove(poly);
+	
+	let firstEdge = face.boundary;
+	let currEdge = firstEdge;
+	
+	let prevx = firstEdge.dest.x;
+	let prevy = firstEdge.dest.y;
+	let vertices = [ new Two.Vector(prevx, prevy) ];
+
+	while (currEdge.next !== firstEdge) {
+		currEdge = currEdge.next;
+		vertices.push(new Two.Vector(currEdge.dest.x, currEdge.dest.y));
+
+		prevx = currEdge.dest.x;
+		prevy = currEdge.dest.y;				
+	}
+	
+	poly = two.makePath(vertices, false);
+	poly.fill = randomColor();
 }
 
 function randomColor(): string {

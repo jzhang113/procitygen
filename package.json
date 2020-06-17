@@ -4,18 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "parcel index.html"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "parcel": "^1.12.4",
     "typescript": "^3.9.3"
   },
   "dependencies": {
     "@types/two.js": "^0.7.2",
     "open-simplex-noise": "^2.3.1",
     "quadtree-lib": "^1.0.9",
+    "robust-predicates": "^2.0.4",
     "ts-priority-queue": "^0.1.1",
     "two.js": "^0.7.0-stable.1"
   }
